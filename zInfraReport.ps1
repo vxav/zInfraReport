@@ -17,7 +17,7 @@ param(
     [ValidateNotNullOrEmpty()]
     $VCENTER,
     [PSCredential]$Credential,
-    $DefaultValue = $(Import-Csv .\DefaultValues.csv -Delimiter ";"),
+    $DefaultValue = $(Import-Csv .\DefaultValues.csv),
     $Protocol     = "https",
     $EMAIL        = $(Read-Host "Email report when finished Y/N [n]"),
     $OPENHTML     = $(Read-Host "Open report when finished Y/N [$($DefaultValue.openreport)]"),
@@ -231,7 +231,7 @@ $Modules | ForEach-Object {
         objectarray        = $i | select -Property * -ExcludeProperty TableTitle,Importance,NumberLinesDisplay;
         TableTitle         = $_.name -replace ".ps1",""
         Importance         = $i | select -ExpandProperty importance -Unique;
-        NumberLinesDisplay = $i | select -ExpandProperty NumberLinesDisplay #-Unique -ErrorAction SilentlyContinue
+        NumberLinesDisplay = $i | select -ExpandProperty NumberLinesDisplay -Unique #-ErrorAction SilentlyContinue
     }
 
     Format-HTML @params

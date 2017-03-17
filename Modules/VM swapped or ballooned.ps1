@@ -18,8 +18,8 @@ $Output = $VM | Where-Object {($_.ExtensionData.Summary.QuickStats.BalloonedMemo
         VM        = $_.name
         Host      = $_.vmhost
         Memory    = "$($_.memoryMB) MB"
-        Swapped   = "$($_.Summary.QuickStats.SwappedMemory) MB"
-        Ballooned = "$($_.Summary.QuickStats.BalloonedMemory) MB"
+        Swapped   = "$($_.ExtensionData.Summary.QuickStats.SwappedMemory) MB"
+        Ballooned = "$($_.ExtensionData.Summary.QuickStats.BalloonedMemory) MB"
         
     }
 

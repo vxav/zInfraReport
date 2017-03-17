@@ -17,7 +17,7 @@ $Summary = $VMHost | ForEach-Object {
         'DNS server'              = [string]($_.ExtensionData.Config.Network.DnsConfig.Address | ForEach-Object {"$_ "})
         'Syslog server'           = ($_ | Get-VMHostSyslogServer).Host
         'DomainName/SearchDomain' = "$($_.ExtensionData.Config.Network.DnsConfig.DomainName)/$($_.ExtensionData.Config.Network.DnsConfig.SearchDomain)"
-        'vSwitch/Portgroups'      = "$($_.ExtensionData.Config.Network.Portgroup.count)/$($_.ExtensionData.Config.Network.vswitch.count)"
+        'vSwitch/Portgroups'      = "$($_.ExtensionData.Config.Network.vswitch.count)/$($_.ExtensionData.Config.Network.Portgroup.count)"
         'Service On/Off'          = "$(($_.ExtensionData.Config.Service.Service | where policy -eq on).count)/$(($_.ExtensionData.Config.Service.Service | where policy -eq off).count)"
         'FW rules On/Off'         = "$(($_.ExtensionData.Config.Firewall.Ruleset | where Enabled -eq $true).count)/$(($_.ExtensionData.Config.Firewall.Ruleset | where Enabled -eq $false).count)"
         Ipmi                      = IF ($_.ExtensionData.Config.Ipmi) {"Configured"} ELSE {"Not Configured"}
@@ -38,7 +38,7 @@ $Summary | select * -ExcludeProperty Host |
 
 ) {
 
-$Output = $Summary
+$Output = $Summary | sort-object host
 
 }
 

@@ -34,7 +34,7 @@ $Output = $Datastore | ForEach-Object {
 
     }
 
-} | Sort-Object Datastore
+} | Sort-Object FreeSpace
 
 
 ######################

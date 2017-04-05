@@ -9,7 +9,9 @@
 # Place the output object into the output variable.
 # Remember to sort the object in the variable in relevant order (example: sort by snapshot size descending).
 
-$Output = 
+$Output = $datastore | Where-Object {$_.ExtensionData.Info.Vmfs.VmfsUpgradable} | select name,
+    @{l="Upgradable";e={$_.ExtensionData.Info.Vmfs.VmfsUpgradable}},
+    @{l="Current VMFS version";e={$_.ExtensionData.Info.Vmfs.Version}}
 
 
 ######################
@@ -24,7 +26,7 @@ $Output =
 # Lines to display will display only this number of records but reports the total number of records. leave false to display all records.
 
 $CriticalState = $false
-$WarningState  = $false
+$WarningState  = $Output
 $NumberLinesDisplay = $false
 
 

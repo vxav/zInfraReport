@@ -9,7 +9,14 @@
 # Place the output object into the output variable.
 # Remember to sort the object in the variable in relevant order (example: sort by snapshot size descending).
 
-$Output = 
+$Output = $VMHostView | ForEach-Object {
+    $curhost = $_
+    $_.Runtime.HealthSystemRuntime.SystemHealthInfo.NumericSensorInfo | Where-Object {$_.healthstate.key -ne "green"} | 
+            select @{l="Host";e={$Curhost.name}},
+            Name,
+            Sensortype,
+            @{l="Description";e={$_.healthstate.summary}},
+            @{l="Status";e={$_.healthstate.key}}}
 
 
 ######################
@@ -23,8 +30,8 @@ $Output =
     # $WarningState  = $output | where-object {$_.freePercent -lt 20 -or $_.Provisionned -gt 150}
 # Lines to display will display only this number of records but reports the total number of records. leave false to display all records.
 
-$CriticalState = $false
-$WarningState  = $false
+$CriticalState = $Output | where status -eq "red"
+$WarningState  = $Output | where status -eq "yellow"
 $NumberLinesDisplay = $false
 
 

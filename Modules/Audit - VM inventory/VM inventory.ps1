@@ -1,40 +1,38 @@
-Write-Verbose "Running: $($MyInvocation.MyCommand.Name)"
+﻿Write-Verbose "Running: $($MyInvocation.MyCommand.Name)"
 
 ######################
 # Query run.
 ######################
 # Declare variables and thresholds here if required.
 
-$days = 7
+$now = get-date
 
 # Place the output object into the output variable.
 # Remember to sort the object in the variable in relevant order (example: sort by snapshot size descending).
 
-$Output = Get-VIEvent -Entity ($VM) -Start (Get-Date).AddDays(-$days) -maxsamples ([int]::MaxValue) | ForEach-Object { 
+$Output = $VM | ForEach-Object {
 
-    IF ($_.fullformattedmessage -match "cloned|deployed|created") { 
-    
-        [pscustomobject]@{
-            VM       = $_.vm.name
-            Task     = "Created"
-            Date     = $_.createdtime
-            Username = $_.username
-            Event    = $_.fullformattedmessage
-         }
+    $curVM = $_
 
-    } ELSEIF ($_.fullformattedmessage -like "Removed*on*from*") {
+    [pscustomobject]@{
 
-        [pscustomobject]@{
-            VM       = $_.vm.name
-            Task     = "Removed"
-            Date     = $_.createdtime
-            Username = $_.username
-            Event    = $_.fullformattedmessage
-         }
+        Name = $_.name
+        Uptime   = IF ($_.powerstate -eq "poweredon") {"$([math]::floor($_.ExtensionData.Summary.QuickStats.UptimeSeconds / 3600 /24))d $([math]::ceiling($_.ExtensionData.Summary.QuickStats.UptimeSeconds / 3600 % 24))h"} ELSE {"Off"}
+        NumCPU = $_.numcpu
+        MemoryGB = [math]::Round($_.memorygb,2)
+        Disks = $_.ExtensionData.Summary.Config.NumVirtualDisks
+        vNIC = $_.ExtensionData.Summary.Config.NumEthernetCards
+        Datastore = [string]($datastore | Where-Object {($curVM.ID -replace "VirtualMachine-","") -in $_.ExtensionData.vm.value} | select -ExpandProperty name)
+        Host = $_.vmhost.name
+        GuestName = $_.Guest.ExtensionData.HostName
+        Tools = $_.Guest.ExtensionData.ToolsVersion
+        Compatibility = $_.version
+        
 
-    }    
+    }
 
-} | Sort-Object Task
+} | Sort-Object name
+
 
 ######################
 # Declare object importance and number of lines to display.

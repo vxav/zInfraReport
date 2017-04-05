@@ -3,11 +3,12 @@
 
 Name        : zInfraReport
 Author      : Xavier Avrillier
-Last Update : 16/03/2017
-Version     : 0.1
+Last Update : 05/04/2017
+Version     : 0.8
 Website     : http://vxav.fr
 
-"Set-AlternatingRows" function by Martin Pugh
+The word "Module" in this script refers to each folder inside the Modules folder (except excluded).
+For each "module", there will be an html file and a button/link to each of them on the report page.
 
 ------------------------------------------------
 #>
@@ -16,16 +17,43 @@ param(
     [Parameter(Mandatory=$True)]
     [ValidateNotNullOrEmpty()]
     $VCENTER,
-    [PSCredential]$Credential,
-    $DefaultValue = $(Import-Csv .\DefaultValues.csv),
-    $Protocol     = "https",
-    $EMAIL        = $(Read-Host "Email report when finished Y/N [n]"),
-    $OPENHTML     = $(Read-Host "Open report when finished Y/N [$($DefaultValue.openreport)]"),
-    $HTMLFile     = $(Read-Host "Path to report file [$($DefaultValue.htmlfile)]"),
-    $TO           = $(IF ($EMAIL -eq "Y") {read-host "Send email to [$($DefaultValue.sendto)]"}),
-    $FROM         = $(IF ($EMAIL -eq "Y") {read-host "Send email from [$($DefaultValue.sendfrom)]"}),
-    $SMTP         = $(IF ($EMAIL -eq "Y") {read-host "SMTP server [$($DefaultValue.smtp)]"})
+
+    [string]$SetDefaultValues = $(
+        $def=Read-Host "Set the default values Y/N [n]"
+        IF ($def -eq "Y") {&.\Metadata\Set-DefaultValues.ps1}
+    ),
+
+    [PSCredential]
+    $Credential,
+
+    [PSCustomObject]
+    $DefaultValue = $(Import-Csv .\Metadata\DefaultValues.csv),
+    
+    [ValidateSet("http","https")]
+    [string]$Protocol = "https",
+    [string]$EMAIL    = $(Read-Host "Email report when finished Y/N [n]"),
+    [string]$OPENHTML = $(Read-Host "Open report when finished Y/N [$($DefaultValue.displayreport)]"),
+    [string]$HTMLFile = $(Read-Host "Path to HTML report file [.\zInfraReport_$VCENTER]"),
+    [string]$TO       = $(IF ($EMAIL -eq "Y") {read-host "Send email to [$($DefaultValue.sendto)]"}),
+    [string]$FROM     = $(IF ($EMAIL -eq "Y") {read-host "Send email from [$($DefaultValue.sendfrom)]"}),
+    [string]$SMTP     = $(IF ($EMAIL -eq "Y") {read-host "SMTP server [$($DefaultValue.smtp)]"})
 )
+
+######################
+# Import utility functions and set variables
+######################
+
+. ".\Metadata\Utility-Functions.ps1"
+
+$PowerCLIModules   = "VMware.VimAutomation.Core","VMware.VimAutomation.Sdk","VMware.VumAutomation"
+$ColorCritical     = "#CD5C5C"
+$ColorWarning      = "#FFA500"
+$ColorInfo         = "#4169E1"
+$ColorNull         = "#FFEBCD"
+$ColorBanner       = "0095d3"
+$date              = Get-Date
+
+Clear-Host
 
 Start-Transcript -Path ".\$($MyInvocation.MyCommand.Name).log"
 
@@ -33,40 +61,52 @@ Start-Transcript -Path ".\$($MyInvocation.MyCommand.Name).log"
 # Connection to vCenter
 ######################
 
-Try {
-Import-Module "VMware.VimAutomation.Core","VMware.VimAutomation.Sdk"
+write-output "***   --------------------------------"
+write-output "***   Connecting to vcenter : $VCENTER"
 
-$params = @{Server = $VCENTER ; Protocol = $Protocol}
-
-if ($Credential) {$params.Add('Credential',$Credential)}
-
-Connect-VIServer @params 3>&1 | Out-Null
-
-} CATCH {
-    Write-Error $_.Exception -ErrorAction stop
-    pause
-}
-
-IF ($DefaultVIserver.name -ne $VCENTER) {write-error "Connection to vcenter failed";break}
+IF (!(Connect-vCenter -VCENTER $VCENTER -Protocol $Protocol -Credential $Credential)) {Throw "VCenter connection issue";Exit}
 
 ######################
-# Report settings
+# Preparing report utilities
 ######################
 
-IF (!$HTMLFile) {$HTMLFile = $DefaultValue.htmlfile}
-IF (!$OPENHTML) {$OPENHTML = $DefaultValue.openreport}
+write-output "***   --------------------------------"
+write-output "***   Preparing report utilities"
+
+IF (!$HTMLFile) {$HTMLFile = "zInfraReport-$($DefaultVIserver.name).html"}
+    ELSEIF ($HTMLFile -notlike "*.html") {$HTMLFile = "$HTMLFile.html"}
+
+IF (!$OPENHTML) {$OPENHTML = $DefaultValue.displayreport}
 
 IF ($EMAIL -eq "Y") {
     IF (!$TO)   {$TO   = $DefaultValue.sendto}
     IF (!$FROM) {$FROM = $DefaultValue.sendfrom}
     IF (!$SMTP) {$SMTP = $DefaultValue.smtp}
-   $subject = "$($DefaultVIserver.name) infra report" 
+   $subject = "$($DefaultVIserver.name) infra report - $(get-date -Format s)" 
 }
 
-IF (Test-Path ".\img\$($DefaultVIserver.name).jpg") {
-    $HeadPicture = ".\img\$($DefaultVIserver.name).jpg"
-} ELSE {
-    $HeadPicture = ".\img\default-vcenter.jpg"
+IF (Test-Path ".\img\$($DefaultVIserver.name).jpg") {$HeadPicture = "..\img\$($DefaultVIserver.name).jpg"} # Added a dot to make it accessible from the "Report" sub-folder
+    ELSE {$HeadPicture = "..\img\default-vcenter.jpg"}
+
+######################
+# Preparing objects for every modules
+# These object will contain all the info for each module (folders in ".\Modules")
+######################
+
+write-output "***   --------------------------------"
+write-output "***   Preparing report modules objects"
+
+Try {
+
+$IndexFile = Copy-Item ".\Metadata\Template-index.html" $HTMLFile -Force -PassThru
+
+IF (!(Test-Path "$($IndexFile.Directory)\Reports\")) {New-Item -ItemType Directory "$($IndexFile.Directory)\Reports\"}
+
+$ModuleGroups = Create-ModuleObjects -ModuleGroups (Get-ChildItem Modules | Where-Object {$_.PSIsContainer -and $_.name -ne "excluded"}) -IndexFile $IndexFile
+
+} CATCH {
+    Write-Error $_.Exception -ErrorAction stop
+    Break
 }
 
 ######################
@@ -74,42 +114,46 @@ IF (Test-Path ".\img\$($DefaultVIserver.name).jpg") {
 ######################
 
 # HTML colors: http://www.w3schools.com/colors/colors_names.asp
+# The end of the header is generated on a per module basis to allow for the creation of the button bar
+
+write-output "***   --------------------------------"
+write-output "***   Preparing HTML header and footer"
 
 $Header = @"
+
+<SCRIPT>
+    function Listederoulante() {
+	  i = document.TheForm.List.selectedIndex;
+        if (i == 0) return;
+        url = document.TheForm.List.options[i].value;
+	    parent.location.href = url;
+    }
+</SCRIPT>
+
 <style>
-    TABLE {width: 90%; margin: 0px; padding: 0px;}
-    TH {text-align: left;font-family: Tahoma, sans-serif;color: #018AC0;font-size: 8pt}
-    TD {padding: 0px;font-size: 8pt;font-family: Tahoma, sans-serif;}
-    .odd  { background-color:#ffffff; }
-    .even { background-color:#E9E9E9; }
+    TABLE {text-align: left; width: 95%; margin: 0px; padding: 0px;}
+    TH {font-size: 8pt;font-family: tahoma, sans-serif;color: #0066cc;}
+    TD {padding: 0px;font-size: 8pt;font-family: tahoma, sans-serif;color: #000000;}
+    tr:nth-child(even){background-color: #E9E9E9}
 </style>
 
 <title>$($DefaultVIserver.name) report</title>
 
-<div align="center" style="background-color:447188;">
-    <a href="https://$($DefaultVIserver.name)"><img src=$HeadPicture></a>
+<div align="center" style="background-color:$ColorBanner;">
+    <a href="$("../$($IndexFile.BaseName).html")"><img src=$HeadPicture></a>
 </div>
 
 <div align="center"> 
 
-<table><tr bgcolor="#A9A9A9">
-    <td style="color:#FFFFFF;">
-        Report date: <b>$(Get-Date -Format F)</b>
-        <br>
-        Server connected : <b>$($DefaultVIserver.name)</b>
-        <br>
-        <b>$((Get-ChildItem ./Modules *.ps1).count)</b> modules processed
-    </td>
-</tr></table>
-
 "@
+
 $Footer = @"
 
 </div>
 
 <br>
 
-<div align="center" style="background-color:447188;">
+<div align="center" style="background-color:$ColorBanner;">
 	<font color="FFFFFF">
 	    zInfraReport
 	</font>
@@ -118,162 +162,233 @@ $Footer = @"
 "@
 
 ######################
-# Utility functions
+# Gathering data
 ######################
 
-Function Set-AlternatingRows {
-	<#
-	.NOTES
-		Author:         Martin Pugh
-		Twitter:        @thesurlyadm1n
-		Spiceworks:     Martin9700
-		Blog:           www.thesurlyadmin.com
-		
-		Changelog:
-			1.1         Modified replace to include the <td> tag, as it was changing the class
-                        for the TH row as well.
-            1.0         Initial function release
-	.LINK
-		http://community.spiceworks.com/scripts/show/1745-set-alternatingrows-function-modify-your-html-table-to-have-alternating-row-colors
-    .LINK
-        http://thesurlyadmin.com/2013/01/21/how-to-create-html-reports/
-	#>
-    [CmdletBinding()]
-   	Param(
-       	[Parameter(Mandatory,ValueFromPipeline)]
-        [string]$Line,
-       
-   	    [Parameter(Mandatory)]
-       	[string]$CSSEvenClass,
-       
-        [Parameter(Mandatory)]
-   	    [string]$CSSOddClass
-   	)
-	Begin {
-		$ClassName = $CSSEvenClass
-	}
-	Process {
-		If ($Line.Contains("<tr><td>"))
-		{	$Line = $Line.Replace("<tr>","<tr class=""$ClassName"">")
-			If ($ClassName -eq $CSSEvenClass)
-			{	$ClassName = $CSSOddClass
-			}
-			Else
-			{	$ClassName = $CSSEvenClass
-			}
-		}
-		Return $Line
-	}
-}
+write-output "***   --------------------------------"
+write-output "***   Gathering environment data"
 
-Function Format-HTML {
+Gather-EnvironmentData
 
-param(
-    $ObjectArray,
-    [string]$TableTitle,
-    [string]$Importance,
-    [int]$NumberLinesDisplay
-)
+######################
+# Building HTML sub-reports
+######################
 
-IF ($ObjectArray) {
+write-output "***   --------------------------------"
 
-    $PreTitle = ""
-
-    Switch ($Importance) {
-
-        "Information" {
-            $bgcolor = "RoyalBlue"
-            IF ($ObjectArray.count -gt $NumberLinesDisplay) {$PreTitle = '[First ' + $NumberLinesDisplay + ' results out of ' + ($ObjectArray.count) + ']' }
-            $Script:HtmlReportInformation += '<br><table><tr bgcolor="' + $bgcolor + '"><td style="color:#FFFFFF;"><b>' + $TableTitle + '</b>  ' + $PreTitle + '</td></tr></table>'
-            $Script:HtmlReportInformation += $ObjectArray | select -First $NumberLinesDisplay | ConvertTo-Html | Set-AlternatingRows -CSSEvenClass even -CSSOddClass odd
-        }
-        "Warning"     {
-            $bgcolor = "Orange"
-            IF ($ObjectArray.count -gt $NumberLinesDisplay) {$PreTitle = '[First ' + $NumberLinesDisplay + ' results out of ' + ($ObjectArray.count) + ']' }
-            $Script:HtmlReportWarning += '<br><table><tr bgcolor="' + $bgcolor + '"><td style="color:#FFFFFF;"><b>' + $TableTitle + '</b>  ' + $PreTitle + '</td></tr></table>'
-            $Script:HtmlReportWarning += $ObjectArray | select -First $NumberLinesDisplay | ConvertTo-Html | Set-AlternatingRows -CSSEvenClass even -CSSOddClass odd
-        }
-        "Critical"    {
-            $bgcolor = "IndianRed"
-            $Script:HtmlReportCritical += '<br><table><tr bgcolor="' + $bgcolor + '"><td style="color:#FFFFFF;"><b>' + $TableTitle + '</b></td></tr></table>'
-            $Script:HtmlReportCritical += $ObjectArray | ConvertTo-Html | Set-AlternatingRows -CSSEvenClass even -CSSOddClass odd
-        }
-
-    }
+$ModuleGroups | ForEach-Object {
     
-} ELSE {
+    write-output "***   Processing $($_.ModuleGroupFolder.name)"
 
-    $bgcolor = "khaki"
-    $Script:HtmlReportNull += '<br><table><tr bgcolor="' + $bgcolor + '"><td style="color:#2F4F4F;"><i>' + $TableTitle + ' : 0</i></td></tr></table>'
+    $Script:CriticalCount = 0
+    $Script:WarningCount  = 0
+    $Script:InfoCount     = 0
 
-}
-
-}
-
-######################
-# Data gathering and Building HTML sub-reports
-######################
-
-$VM        = Get-VM
-$VMHost    = Get-VMHost
-$Datastore = Get-Datastore
-
-$Modules = Get-ChildItem ./Modules *.ps1
-$Processed = 1
-
-$Modules | ForEach-Object {
+    $Modules = Get-ChildItem $_.ModuleGroupFolder.fullname "*.ps1"
     
-    Write-Progress -PercentComplete ($Processed/$Modules.count*100) -Activity ("$Processed/$($Modules.count) : "+$_.Name -replace '.ps1','')
+    $Processed = 1
 
-    $i = &$_.FullName
+    $host.privatedata.ProgressBackgroundColor = "DarkBlue"
 
-    $params = @{
-        objectarray        = $i | select -Property * -ExcludeProperty TableTitle,Importance,NumberLinesDisplay;
-        TableTitle         = $_.name -replace ".ps1",""
-        Importance         = $i | select -ExpandProperty importance -Unique;
-        NumberLinesDisplay = $i | select -ExpandProperty NumberLinesDisplay -Unique #-ErrorAction SilentlyContinue
+    # Running ps1 scripts of this module
+
+    $Modules | ForEach-Object {
+        
+        write-output "***     - Sub-processing $($_.name)"
+
+        Write-Progress -Activity ($Modules.DirectoryName.split('\') | select -Last 1) -PercentComplete ($Processed/$Modules.count*100) -Status ("$Processed/$($Modules.count) : "+$_.Name -replace '.ps1','')
+
+        $i = &$_.FullName
+
+        $params = @{
+            objectarray        = $i | select -Property * -ExcludeProperty TableTitle,Importance,NumberLinesDisplay;
+            TableTitle         = $_.name -replace ".ps1",""
+            Importance         = $i | select -ExpandProperty importance -Unique;
+            NumberLinesDisplay = $i | select -ExpandProperty NumberLinesDisplay -Unique #-ErrorAction SilentlyContinue
+        }
+
+        Format-HTML @params
+    
+        $Processed++
     }
 
-    Format-HTML @params
-    
-    $Processed++
+    # Setting the button color of this module
+
+    write-output "***     - Setting button color and preparing end of header"
+
+    IF ($HtmlReportCritical) {
+        $_.ModuleGroupButton = $_.ModuleGroupButton -replace "REPLACEME",$ColorCritical
+        $CriticalIndex += 
+@"
+<tr>
+<td style="Border-left:5px solid $ColorCritical;">
+<a href="$($_.ModuleGroupUrl)">$($_.ModuleGroupFolder.name)</a></td>
+<td>$($_.ModuleGroupDescription)</td>
+<td>$CriticalCount</td>
+<td>$WarningCount</td>
+<td>$InfoCount</td>
+</tr>
+"@
+    } ELSEIF ($HtmlReportWarning) {
+        $_.ModuleGroupButton = $_.ModuleGroupButton -replace "REPLACEME",$ColorWarning
+        $WarningIndex += 
+@"
+<tr>
+<td style="Border-left:5px solid $ColorWarning;">
+<a href="$($_.ModuleGroupUrl)">$($_.ModuleGroupFolder.name)</a></td>
+<td>$($_.ModuleGroupDescription)</td>
+<td>$CriticalCount</td>
+<td>$WarningCount</td>
+<td>$InfoCount</td>
+</tr>
+"@
+    } ELSEIF ($HtmlReportInformation) {
+        $_.ModuleGroupButton = $_.ModuleGroupButton -replace "REPLACEME",$ColorInfo
+        $InfoIndex += 
+@"
+<tr>
+<td style="Border-left:5px solid $ColorInfo;">
+<a href="$($_.ModuleGroupUrl)">$($_.ModuleGroupFolder.name)</a></td>
+<td>$($_.ModuleGroupDescription)</td>
+<td>$CriticalCount</td>
+<td>$WarningCount</td>
+<td>$InfoCount</td>
+</tr>
+"@
+    } ELSE {
+        $_.ModuleGroupButton = $_.ModuleGroupButton -replace "REPLACEME",$ColorNull
+        $NullIndex += 
+@"
+<tr>
+<td style="Border-left:5px solid $ColorNull;">
+<a href="$($_.ModuleGroupUrl)">$($_.ModuleGroupFolder.name)</a></td>
+<td>$($_.ModuleGroupDescription)</td>
+<td>$CriticalCount</td>
+<td>$WarningCount</td>
+<td>$InfoCount</td>
+</tr>
+"@
+    }
+
+
+    # Preparing this module's end of header without the button bar
+
+    $PostHeader = @"
+
+BUTTONSBAR
+
+<table><tr bgcolor="#A9A9A9">
+    <td style="color:#FFFFFF;">
+        Report date: <b>$date</b>
+        <br>
+        Server connected : <b>$($DefaultVIserver.name)</b>
+        <br>
+        Category : <b>$($_.ModuleGroupFolder.name)</b>
+    </td>
+</tr></table>
+
+"@
+
+    # Store report without the button bar nor button colors in this module's variable
+
+    write-output "***     - Writing report in the property of the module's object"
+
+    $_.ModuleGroupReportContent =  $Header
+    $_.ModuleGroupReportContent += $PostHeader
+    $_.ModuleGroupReportContent += $HtmlReportCritical
+    $_.ModuleGroupReportContent += $HtmlReportWarning
+    $_.ModuleGroupReportContent += $HtmlReportInformation
+    $_.ModuleGroupReportContent += "<br>"
+    $_.ModuleGroupReportContent += $HtmlReportNull
+    $_.ModuleGroupReportContent += $Footer
+
+    Clear-Variable HtmlReportCritical,HtmlReportWarning,HtmlReportInformation,HtmlReportNull,PostHeader -ErrorAction SilentlyContinue
+
+    write-output "***   Processing finished for $($_.ModuleGroupFolder.name)"
+    write-output "***   ----------------"
 }
+
+######################
+# Building report and place button bar
+######################
+# $($ModuleGroups.ModuleGroupButton) replace
+$ListeHtml =
+@"
+
+<FORM name="TheForm" method="post">
+<SELECT name="List" onChange="Listederoulante(this.form)">
+<OPTION VALUE="">- Change report -
+REPLACELISTE
+</SELECT>
+</FORM>
+"@
+
+write-output "***   --------------------------------"
+write-output "***   Writting reports content in report files"
+
+$ModuleGroups | ForEach-Object {
+    
+    $CurModuleGroup = $_
+
+    # Creating button bar with associated colors for the current module 
+
+    $ModuleGroups | ForEach-Object {
+
+        IF ($_.ModuleGroupFolder -ne $CurModuleGroup.ModuleGroupFolder) {
+        
+            $Bouton += $_.ModuleGroupButton
+        
+        } 
+    
+    }
+
+    $REPLACELIST = $ListeHtml -replace "REPLACELISTE",$Bouton
+
+    # Placing button bar in the report of the current module
+
+    IF (($ModuleGroups | measure-object).count -eq 1) {$rapport = $_.ModuleGroupReportContent -replace "BUTTONSBAR","<!-- Button bar disabled when only a single report -->"}
+        ELSE {$rapport = $_.ModuleGroupReportContent -replace "BUTTONSBAR",$REPLACELIST}
+
+    # Placing the report content in its HTML file
+
+    $rapport | Out-File $_.ModuleGroupReport
+
+    IF ($Bouton) {Clear-Variable Bouton}
+
+}
+
+write-output "***   --------------------------------"
+write-output "***   Writting index file"
+
+(Get-Content $IndexFile) `
+    -replace "VCENTERVERSION",$Global:DefaultVIServer.ExtensionData.Content.About.FullName `
+    -replace "PLACEREPORTSHERE","$CriticalIndex $WarningIndex $InfoIndex $NullIndex" `
+    -replace "DATEHERE",$date `
+    | Out-File $IndexFile -Force
 
 Disconnect-VIServer -Confirm:$false
-
-######################
-# Building HTML global report
-######################
-
-$Header                | Out-File $HTMLFile
-$HtmlReportCritical    | Out-File $HTMLFile -Append
-$HtmlReportWarning     | Out-File $HTMLFile -Append
-$HtmlReportInformation | Out-File $HTMLFile -Append
-$HtmlReportNull        | Out-File $HTMLFile -Append
-$Footer                | Out-File $HTMLFile -Append
-
 
 ######################
 # Issuing report
 ######################
 
-IF ($EMAIL -eq "Y") {
-    
-    $Body = [string](Get-Content $HTMLFile).Replace('img\','')
-
-    $params = @{
-        To=$TO;
-        From=$From;
-        SMTP=$SMTP;
-        subject=$subject;
-        Body=$Body;
-        BodyAsHtml=$True;
-        Attachments=$HeadPicture
+    IF ($EMAIL -eq "Y") {
+        $params = @{
+            To=$TO;
+            From=$From;
+            SMTP=$SMTP;
+            subject=$subject;
+            Body="Find reports for $($DefaultVIserver.name) attached";
+            Attachments=$ModuleGroups.ModuleGroupReport
+        }
+        Send-MailMessage @params
     }
 
-    Send-MailMessage @params
-}
+IF ($OPENHTML -eq "Y") {&$IndexFile}
 
-IF ($OPENHTML -eq "Y") {&$HTMLFile}
+write-output "***   Ground control: Out"
 
 Stop-Transcript
+
+
+

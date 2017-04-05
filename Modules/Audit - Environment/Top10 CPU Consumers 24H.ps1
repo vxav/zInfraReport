@@ -5,11 +5,23 @@
 ######################
 # Declare variables and thresholds here if required.
 
+$TOPx = 10
 
 # Place the output object into the output variable.
 # Remember to sort the object in the variable in relevant order (example: sort by snapshot size descending).
 
-$Output = 
+$Output = $VM | where powerstate -eq poweredon | ForEach-Object {
+    $cur = $_
+
+    get-stat -Stat "cpu.demand.average" -Entity ($_)  -IntervalMins 5 | 
+        Measure-Object -Property Value -Average -Maximum -Minimum | 
+        select @{l="VM";e={$cur.name}},
+        @{l="vCPU";e={$cur.numcpu}},
+        @{l="Average MHz";e={[math]::round($_.average,0)}},
+        @{l="Minimum MHz";e={[math]::round($_.minimum,0)}},
+        @{l="Maximum MHz";e={[math]::round($_.maximum,0)}}       
+
+} | Sort-Object "Average MHz" -Descending | Select -First $TOPx
 
 
 ######################

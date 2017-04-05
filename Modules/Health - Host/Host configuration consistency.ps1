@@ -22,6 +22,7 @@ $Summary = $VMHost | ForEach-Object {
         'FW rules On/Off'         = "$(($_.ExtensionData.Config.Firewall.Ruleset | where Enabled -eq $true).count)/$(($_.ExtensionData.Config.Firewall.Ruleset | where Enabled -eq $false).count)"
         Ipmi                      = IF ($_.ExtensionData.Config.Ipmi) {"Configured"} ELSE {"Not Configured"}
         VmotionEnabled            = $_.ExtensionData.Summary.Config.VmotionEnabled
+        PowerPolicy               = $_.ExtensionData.Hardware.CpuPowerManagementInfo.CurrentPolicy
     }
 
 }

@@ -9,7 +9,26 @@
 # Place the output object into the output variable.
 # Remember to sort the object in the variable in relevant order (example: sort by snapshot size descending).
 
-$Output = 
+$Output = $VMHost | ForEach-Object {
+
+    [pscustomobject]@{
+
+        Host     = $_.name
+        Model    = "$($_.Manufacturer) $($_.Model)"
+        Processor= "$($_.ExtensionData.Hardware.CpuInfo.NumCpuPackages) X $($_.ProcessorType)"
+        pCores   = $_.numcpu
+        HT       = $_.HyperthreadingActive
+        CpuGHz   = [math]::round($_.cputotalmhz/1kb,2)
+        CpuUsage = "$([math]::round($_.CpuUsageMhz / $_.CpuTotalMhz * 100,1)) %"
+        "vCpu:Core"= "$([math]::round(($Vm | where vmhost -eq $_ | where powerstate -eq poweredon | Measure-Object -Property numcpu -Sum).sum / ($_.numcpu),2)):1"
+        MemoryGB = [math]::round($_.MemoryTotalGB,0)
+        MemoryUsage = "$([math]::round($_.MemoryUsageGB / $_.MemoryTotalGB * 100,1)) %"
+        NICs     = $_.ExtensionData.Summary.Hardware.NumNics
+        Uptime   = (get-date) - ($_.ExtensionData.Runtime.BootTime) | ForEach-Object { "$($_.days) days $($_.hours) hours"}
+
+    }
+
+} | Sort-Object host
 
 
 ######################

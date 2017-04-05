@@ -1,26 +1,16 @@
 Write-Verbose "Running: $($MyInvocation.MyCommand.Name)"
 
 ######################
-# Query run
+# Query run.
 ######################
-# Declare variables and thresholds here.
 
-$VMFREEPC = 10
-$VMFREEGB = 4
+# If required declare variables and thresholds here.
+
 
 # Place the output object into the output variable.
+# Sort the object in the variable in relevant order (example: sort by snapshot size descending).
 
-$Output = $VM | ForEach-Object {
-
-    $curVM = $_
-
-    $_.Guest.Disks | select @{l="VM";e={$curVM.name}},
-        Path,
-        @{l="Capacity";e={[math]::Round($_.CapacityGB,2)}},
-        @{l="FreeGB";e={[math]::Round($_.FreeSpaceGB,2)}},
-        @{l="FreePercent";e={[math]::Round(($_.FreeSpace / $_.Capacity * 100),1)}} | Where-Object {$_.FreePercent -lt $VMFREEPC -and $_.FreeGB -lt $VMFREEGB}
-
-} | Sort-Object FreeGB
+$Output = $VM | where powerstate -eq poweredon | Select @{l="VM";e={$_.Name}},@{l="ToolsStatus";E={$_.ExtensionData.Guest.ToolsStatus}},PowerState | where ToolsStatus -eq "toolsNotInstalled"
 
 
 ######################
@@ -34,8 +24,8 @@ $Output = $VM | ForEach-Object {
     # $WarningState  = $output | where-object {$_.freePercent -lt 20 -or $_.Provisionned -gt 150}
 # Lines to display will display only this number of records but reports the total number of records. Comment it to display all records.
 
-$CriticalState = $Output | Where-Object {$_.FreeGB -lt 2 -or $_.freePercent -lt 5}
-$WarningState  = $Output | Where-Object {$_.FreeGB -lt $VMFREEGB -or $_.freePercent -lt $VMFREEPC}
+$CriticalState = $false
+$WarningState  = $true
 $NumberLinesDisplay = 10
 
 

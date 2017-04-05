@@ -9,7 +9,27 @@
 # Place the output object into the output variable.
 # Remember to sort the object in the variable in relevant order (example: sort by snapshot size descending).
 
-$Output = 
+$Output = $datastore | ForEach-Object {
+    
+    $curDS = $_
+
+    [pscustomobject]@{
+
+        Name          = $_.name
+        LiveVM        = $VM | Where-Object {($_.ID -replace "VirtualMachine-","") -in $curDS.ExtensionData.vm.value} | where powerstate -eq poweredon | Measure-Object | select -ExpandProperty count
+        CapacityGB    = [math]::round($_.capacityGB,2)
+        FreeGB        = [math]::round($_.FreeSpaceGB,2)
+        FreeSpace     = "$([math]::round($_.FreeSpaceGB / $_.capacityGB * 100,2)) %"
+        ProvisionedGB = [Math]::Round((($_.extensiondata.summary.capacity - $_.extensiondata.summary.FreeSpace + $_.extensiondata.summary.Uncommitted) / 1GB),2)
+        LunBacking    = IF ($_.type -eq "vmfs") {$_.ExtensionData.Info.Vmfs.Extent.diskname} ELSEIF ($_.type -eq "nfs") {$_.RemotePath} ELSE {"Unknown"}
+        MountPath     = $_.ExtensionData.Host[0].Mountinfo.path
+        Type          = IF ($_.type -eq "vmfs") {"$($_.type) $($_.FileSystemVersion)"} ELSE {$_.type}
+        IsLocal       = IF ($_.type -eq "vmfs") {$_.ExtensionData.Info.Vmfs.Local} ELSE {""}
+        Ssd           = IF ($_.type -eq "vmfs") {$_.ExtensionData.Info.Vmfs.SSD} ELSE {""}
+
+    }
+
+} | Sort-Object name
 
 
 ######################

@@ -1,16 +1,40 @@
-﻿Write-Verbose "Running: $($MyInvocation.MyCommand.Name)"
+Write-Verbose "Running: $($MyInvocation.MyCommand.Name)"
 
 ######################
 # Query run.
 ######################
 # Declare variables and thresholds here if required.
 
+$days = 7
 
 # Place the output object into the output variable.
 # Remember to sort the object in the variable in relevant order (example: sort by snapshot size descending).
 
-$Output = 
+$Output = Get-VIEvent -Entity ($VM) -Start (Get-Date).AddDays(-$days) -maxsamples ([int]::MaxValue) | ForEach-Object { 
 
+    IF ($_.fullformattedmessage -match "cloned|deployed|created") { 
+    
+        [pscustomobject]@{
+            VM       = $_.vm.name
+            Task     = "Created"
+            Date     = $_.createdtime
+            Username = $_.username
+            Event    = $_.fullformattedmessage
+         }
+
+    } ELSEIF ($_.fullformattedmessage -like "Removed*on*from*") {
+
+        [pscustomobject]@{
+            VM       = $_.vm.name
+            Task     = "Removed"
+            Date     = $_.createdtime
+            Username = $_.username
+            Event    = $_.fullformattedmessage
+         }
+
+    }    
+
+} | Sort-Object Date
 
 ######################
 # Declare object importance and number of lines to display.

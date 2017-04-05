@@ -5,11 +5,45 @@
 ######################
 # Declare variables and thresholds here if required.
 
+$ViewTypes = "ComputeResource","ClusterComputeResource","Datacenter","Datastore","Network","DistributedVirtualPortgroup","DistributedVirtualSwitch","Folder","HostSystem","ResourcePool","VirtualApp","VirtualMachine","VmwareDistributedVirtualSwitch"
+
+function Get-triggeredAlarm {
+
+param(
+    [ValidateSet("ComputeResource","ClusterComputeResource","Datacenter","Datastore","Network","DistributedVirtualPortgroup","DistributedVirtualSwitch","Folder","HostSystem","ResourcePool","VirtualApp","VirtualMachine","VmwareDistributedVirtualSwitch")]
+    $ViewType
+)
+
+$ViewType | ForEach-Object {
+
+$view = Get-View -viewtype $_
+
+foreach($triggered in $view.TriggeredAlarmState){
+  
+  $alarmDef = Get-View -Id $triggered.Alarm
+  
+  $alarmDef | ForEach-Object {
+  [pscustomobject]@{
+
+    Entity = (get-view -id $triggered.entity).name
+    Time = $triggered.Time
+    Name = $_.info.name
+    Status = $triggered.OverallStatus
+
+  }
+ 
+}
+
+}
+
+} | select -Unique *
+
+}
 
 # Place the output object into the output variable.
 # Remember to sort the object in the variable in relevant order (example: sort by snapshot size descending).
 
-$Output = 
+$Output = Get-triggeredAlarm -ViewType $ViewTypes | Sort-Object Time -Descending
 
 
 ######################
@@ -23,8 +57,8 @@ $Output =
     # $WarningState  = $output | where-object {$_.freePercent -lt 20 -or $_.Provisionned -gt 150}
 # Lines to display will display only this number of records but reports the total number of records. leave false to display all records.
 
-$CriticalState = $false
-$WarningState  = $false
+$CriticalState = $Output | where Status -eq Red
+$WarningState  = $Output | where Status -eq Yellow
 $NumberLinesDisplay = $false
 
 

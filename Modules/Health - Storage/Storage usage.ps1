@@ -27,6 +27,7 @@ $Output = $Datastore | ForEach-Object {
         [pscustomobject]@{
             Datastore     = $_.name
             Capacity      = [string]$CapacityGB + " GB"
+            FreeSpaceGB  = [string]$FreeGB + " GB"
             FreeSpace     = [string]$FreePercent + " %"
             Provisioned  = [string]$ProvisionedPercent + " %"
             NbRunningVMs  = $nbVM
@@ -48,8 +49,8 @@ $Output = $Datastore | ForEach-Object {
     # $WarningState  = $output | where-object {$_.freePercent -lt 20 -or $_.Provisionned -gt 150}
 # Lines to display will display only this number of records but reports the total number of records. Comment it to display all records.
 
-$CriticalState = $Output | Where-Object {[int]($_.FreeSpace -split " %")[0] -lt 10 -or [int]($_.Provisioned -split " %")[0] -gt 200 -or $_.NbRunningVMs -gt 25}
-$WarningState  = $Output | Where-Object {[int]($_.FreeSpace -split " %")[0] -lt $DatastoreLowPercent -or [int]($_.Provisioned -split " %")[0] -gt $DatastoreHighProvPercent -or $_.NbRunningVMs -gt 16}
+$CriticalState = $Output | Where-Object {[int]($_.FreeSpace -split " %")[0] -lt 12 -or [int]($_.Provisioned -split " %")[0] -gt 180 -or $_.NbRunningVMs -gt 25}
+$WarningState  = $Output | Where-Object {[int]($_.FreeSpace -split " %")[0] -lt $DatastoreLowPercent -or [int]($_.Provisioned -split " %")[0] -gt $DatastoreHighProvPercent -or $_.NbRunningVMs -gt $DatastoreTooManyVM}
 $NumberLinesDisplay = $false
 
 

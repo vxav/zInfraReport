@@ -1,30 +1,40 @@
-﻿Write-Verbose "Running: $($MyInvocation.MyCommand.Name)"
+Write-Verbose "Running: $($MyInvocation.MyCommand.Name)"
 
 ######################
-# Query run.
+# Query run
 ######################
-# Declare variables and thresholds here if required.
+# Declare variables and thresholds here.
 
+$VMFREEPC = 10
 
 # Place the output object into the output variable.
-# Remember to sort the object in the variable in relevant order (example: sort by snapshot size descending).
 
-$Output = 
+$Output = $VM | ForEach-Object {
+
+    $curVM = $_
+
+    $_.Guest.Disks | select @{l="VM";e={$curVM.name}},
+        Path,
+        @{l="CapacityGB";e={[math]::Round($_.CapacityGB,2)}},
+        @{l="FreeGB";e={[math]::Round($_.FreeSpaceGB,2)}},
+        @{l="FreePercent";e={[math]::Round(($_.FreeSpace / $_.Capacity * 100),1)}}
+
+} | Where-Object {$_.freePercent -le $VMFREEPC} | Sort-Object FreePercent
 
 
 ######################
 # Declare object importance and number of lines to display.
 ######################
 # Write a condition that should trigger each state based on the output object
-# If the event should always be critical or warning, set the relevant variable to $true. Otherwise set them to $false.
+# If the event should always be critical or warning, set the relevant variable to $true
 # If nothing is specified, the event is treated as information
 # Example for a datastore space usage:
     # $CriticalState = $output | where-object {$_.freePercent -lt 10 -or $_.Provisionned -gt 200}
     # $WarningState  = $output | where-object {$_.freePercent -lt 20 -or $_.Provisionned -gt 150}
-# Lines to display will display only this number of records but reports the total number of records. leave false to display all records.
+# Lines to display will display only this number of records but reports the total number of records. Comment it to display all records.
 
-$CriticalState = $false
-$WarningState  = $false
+$CriticalState = $Output | Where-Object {$_.freePercent -le 5}
+$WarningState  = $true
 $NumberLinesDisplay = $false
 
 

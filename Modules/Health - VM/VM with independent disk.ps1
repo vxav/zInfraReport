@@ -1,32 +1,31 @@
-Write-Verbose "Running: $($MyInvocation.MyCommand.Name)"
+﻿Write-Verbose "Running: $($MyInvocation.MyCommand.Name)"
 
 ######################
 # Query run.
 ######################
-
-# If required declare variables and thresholds here.
+# Declare variables and thresholds here if required.
 
 
 # Place the output object into the output variable.
-# Sort the object in the variable in relevant order (example: sort by snapshot size descending).
+# Remember to sort the object in the variable in relevant order (example: sort by snapshot size descending).
 
-$Output = $VM | where name -NotLike "*_replica" | Select @{l="VM";e={$_.Name}},@{l="ToolsStatus";E={$_.ExtensionData.Guest.ToolsStatus}},PowerState | where ToolsStatus -eq "toolsNotInstalled"
+$Output = $VM | Get-HardDisk | where Persistence -like "Independent*" | Select @{l="VM";e={$_.Parent}},Name,FileName,CapacityGB,Persistence
 
 
 ######################
 # Declare object importance and number of lines to display.
 ######################
 # Write a condition that should trigger each state based on the output object
-# If the event should always be critical or warning, set the relevant variable to $true
+# If the event should always be critical or warning, set the relevant variable to $true. Otherwise set them to $false.
 # If nothing is specified, the event is treated as information
 # Example for a datastore space usage:
     # $CriticalState = $output | where-object {$_.freePercent -lt 10 -or $_.Provisionned -gt 200}
     # $WarningState  = $output | where-object {$_.freePercent -lt 20 -or $_.Provisionned -gt 150}
-# Lines to display will display only this number of records but reports the total number of records. Comment it to display all records.
+# Lines to display will display only this number of records but reports the total number of records. leave false to display all records.
 
 $CriticalState = $false
-$WarningState  = $true
-$NumberLinesDisplay = 10
+$WarningState  = $false
+$NumberLinesDisplay = $false
 
 
 ######################

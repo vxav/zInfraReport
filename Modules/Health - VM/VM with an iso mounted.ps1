@@ -1,4 +1,4 @@
-﻿Write-Verbose "Running: $($MyInvocation.MyCommand.Name)"
+Write-Verbose "Running: $($MyInvocation.MyCommand.Name)"
 
 ######################
 # Query run.
@@ -10,20 +10,21 @@
 # Place the output object into the output variable.
 # Sort the object in the variable in relevant order (example: sort by snapshot size descending).
 
-$Output = $VM | where name -NotLike *_replica |Get-Snapshot | ForEach-Object {
+$Output = $VM | ForEach-Object { 
+    
+    IF ($ISO) {Clear-variable ISO}
 
-    [pscustomobject]@{
+    $ISO = $_ | Get-CDDrive
 
-        # Output properties
-        VM = $_.VM
-        Created = $_.Created
-        Name = $_.name
-        Description = $_.description
-        SizeMB = [math]::Round($_.SizeMB,0)
-        PowerState = $_.PowerState
+    IF ($ISO.ISOPath) {
 
+        [pscustomobject]@{
+            VM = $_.Name
+            Connected = $ISO.ConnectionState.Connected
+            ISO = $ISO.ISOPath
+        }
     }
-} | Sort-Object SizeMB -Descending
+}
 
 
 ######################
@@ -38,8 +39,8 @@ $Output = $VM | where name -NotLike *_replica |Get-Snapshot | ForEach-Object {
 # Lines to display will display only this number of records but reports the total number of records. Comment it to display all records.
 
 $CriticalState = $false
-$WarningState  = $true
-$NumberLinesDisplay = 10
+$WarningState  = $false
+$NumberLinesDisplay = $false
 
 
 ######################

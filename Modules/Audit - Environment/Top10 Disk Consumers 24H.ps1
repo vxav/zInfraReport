@@ -5,43 +5,31 @@
 ######################
 # Declare variables and thresholds here if required.
 
-function Get-triggeredAlarm {
+$TOPx = 10
 
-param(
-    [ValidateSet("ComputeResource","ClusterComputeResource","Datacenter","Datastore","Network","DistributedVirtualPortgroup","DistributedVirtualSwitch","Folder","HostSystem","ResourcePool","VirtualApp","VirtualMachine","VmwareDistributedVirtualSwitch")]
-    $ViewType
-)
 
-$ViewType | ForEach-Object {
-
-$view = Get-View -viewtype $_
-
-foreach($triggered in $view.TriggeredAlarmState){
-  
-  $alarmDef = Get-View -Id $triggered.Alarm
-  
-  $alarmDef | ForEach-Object {
-  [pscustomobject]@{
-
-    Entity = (get-view -id $triggered.entity).name
-    Time = $triggered.Time
-    Name = $_.info.name
-    Status = $triggered.OverallStatus
-
-  }
- 
-}
-
-}
-
-} | select -Unique *
-
-}
 
 # Place the output object into the output variable.
 # Remember to sort the object in the variable in relevant order (example: sort by snapshot size descending).
 
-$Output = Get-triggeredAlarm -ViewType "ComputeResource","ClusterComputeResource","Datacenter","Datastore","Network","DistributedVirtualPortgroup","DistributedVirtualSwitch","Folder","HostSystem","ResourcePool","VirtualApp","VirtualMachine","VmwareDistributedVirtualSwitch"
+$Output = $VM | where powerstate -eq poweredon | ForEach-Object {
+
+    $W_KBPS = Get-Stat -Stat virtualdisk.write.average -Entity ($_) -IntervalMins 5 | Where-Object {!$_.instance} | 
+        Measure-Object -Property Value -Average | select -ExpandProperty average
+
+    $R_KBPS = Get-Stat -Stat virtualdisk.read.average -Entity ($_) -IntervalMins 5 | Where-Object {!$_.instance} | 
+        Measure-Object -Property Value -Average | select -ExpandProperty average
+
+    [pscustomobject]@{
+
+        VM = $_.name
+        "Average Kbps" = [math]::round($W_KBPS + $R_KBPS,0)
+        "Read %"    = [math]::round($R_KBPS / ($W_KBPS + $R_KBPS) * 100,0)
+        "Write %"   = [math]::round($W_KBPS / ($W_KBPS + $R_KBPS) * 100,0)
+
+    }
+
+} | Sort-Object "Average Kbps" -Descending | select -First $TOPx
 
 
 ######################
@@ -55,8 +43,8 @@ $Output = Get-triggeredAlarm -ViewType "ComputeResource","ClusterComputeResource
     # $WarningState  = $output | where-object {$_.freePercent -lt 20 -or $_.Provisionned -gt 150}
 # Lines to display will display only this number of records but reports the total number of records. leave false to display all records.
 
-$CriticalState = $Output | where Status -eq Red
-$WarningState  = $Output | where Status -eq Yellow
+$CriticalState = $false
+$WarningState  = $false
 $NumberLinesDisplay = $false
 
 

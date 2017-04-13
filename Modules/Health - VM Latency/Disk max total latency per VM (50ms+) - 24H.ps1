@@ -20,7 +20,7 @@ $Output = $Latencies24H | where value -gt $latencyThreshold | ForEach-Object {
             Host = $curVM.vmhost.name
             Datastore = [string]($datastore | Where-Object {($curVM.ID -replace "VirtualMachine-","") -in $_.ExtensionData.vm.value} | select -ExpandProperty name)
             Latency = "$($_.value) ms"
-            Time = $_.timestamp
+            Time = get-date $_.timestamp -format u
 
         }
 

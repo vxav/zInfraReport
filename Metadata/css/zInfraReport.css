@@ -1,0 +1,145 @@
+/*
+Generic tags styling
+*/
+
+H2 {
+	font-family: Tahoma;
+}
+
+H3 {
+	font-family: Tahoma;
+	font-size: 10pt;
+}
+
+TABLE {
+    border-collapse: collapse;
+	text-align: left; 
+	width: 95%; 
+	margin: 0px; 
+	padding: 0px;
+}
+
+TH {
+	font-size: 8pt;
+	font-family: tahoma, sans-serif;
+	color: #0066cc;
+}
+
+TD {
+	padding: 0px;
+	font-size: 8pt;
+	font-family: tahoma, sans-serif;
+	color: #000000;
+}
+
+tr:nth-child(even){background-color: #E9E9E9;}
+
+/*
+JQuery Tablesorter styling
+*/
+
+th.header { 
+    cursor: pointer; 
+    font-weight: bold; 
+    background-repeat: no-repeat; 
+    background-position: center left; 
+} 
+
+th.headerSortDown, th.headerSortUp, th.header:hover{ 
+	background-color:#778899;
+	border-radius: 5px;
+	color: #F8F8FF;
+}
+
+th.headerSortDown {
+	background-position: center right;
+	background-repeat: no-repeat; 
+	background-image: url(../../img/desc.gif); 
+}
+
+th.headerSortUp {
+	background-position: center right;
+	background-repeat: no-repeat; 
+	background-image: url(../../img/asc.gif); 
+}
+
+tbody tr:hover, table.tableindex tr:hover td {
+	background-color:#ADD8E6;
+}
+
+/*
+Classes for reports styling
+*/
+
+.reportinfo, .headerfooterbg, .critical, .warning, .information {
+	color: #FFFFFF;
+	padding-left: 2px;
+}
+
+.reportinfo {
+	padding-left: 2px;
+	background-color: #A9A9A9;
+}
+
+.headerfooterbg {
+	background-color: #0095d3;
+	text-align: center;
+}
+
+.critical {
+	background-color: #CD5C5C;
+}
+
+.warning {
+	background-color: #FFA500;
+}
+
+.information {
+	background-color: #4169E1;
+}
+
+.noresult {
+	background-color: #FFEBCD;
+	color: #191970;
+	border-style:none;
+}
+
+/*
+Classes for index file styling
+*/
+
+table.tableindex {
+	width: 65%;
+	font-family: Tahoma;
+	Border-right:1px solid #D3D3D3;
+}
+
+table.tableindex th, table.tableindex td {
+    text-align: left;
+    padding: 8px;
+	border-bottom: 1px solid #D3D3D3;
+	font-size: 12pt;
+	background-color: white;
+}
+
+table.tableindex th {
+    background-color: #0095d3;
+    color: white;
+	font-size: 12pt;
+}
+
+.criticalindex {
+	Border-left:5px solid #CD5C5C;
+}
+
+.warningindex {
+	Border-left:5px solid #FFA500;
+}
+
+.infoindex {
+	Border-left:5px solid #4169E1;
+}
+
+.noresultindex {
+	Border-left:5px solid #FFEBCD;
+}

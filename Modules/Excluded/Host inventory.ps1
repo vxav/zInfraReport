@@ -11,26 +11,25 @@
 
 $Output = $VMHost | ForEach-Object {
     
-    $AllLun = $_ | Get-scsilun 
-    
-    $AllLun | Get-scsilunpath | Where-Object {$_.state -eq "dead" -or $_.state -eq "Unknown" -or $_.state -eq "Disabled"} | ForEach-Object {
+    $curHost = $_
 
-        $Canonical = $_.SCSILun
+    [pscustomobject]@{
 
-        [pscustomobject]@{
-
-            Datastore =  $datastore | Where-Object {$_.ExtensionData.Info.Vmfs.Extent.diskname -contains $Canonical} | select -ExpandProperty name
-            Lun = $Canonical
-            Host = ($AllLun | Where-Object {$_.canonicalname -eq $lunid}).vmhost.name
-            'Lun State' = [string](($AllLun | Where-Object {$_.canonicalname -eq $lunid}).extensiondata.operationalstate)
-            Path = $_.LunPath
-            'Path State' = $_.State
-
-        }
+        Host     = $_.name
+        Vendor   = $_.Manufacturer
+        Model    = $_.Model
+        Processor= "$($_.ExtensionData.Hardware.CpuInfo.NumCpuPackages) x $($_.ProcessorType)"
+        pCores   = $_.numcpu
+        HT       = $_.HyperthreadingActive
+        CpuGHz   = [math]::round($_.cputotalmhz/1kb,2)
+        MemoryGB = [math]::round($_.MemoryTotalGB,0)
+        NICs     = $_.ExtensionData.Summary.Hardware.NumNics
+        LocalDS  = $datastore | Where-Object {$_.ExtensionData.info.Vmfs.local -and $_.ExtensionData.Host.key.value -eq ($curHost.id -replace "HostSystem-","")} | Measure-Object | select -ExpandProperty count
+        Uptime   = (get-date) - ($_.ExtensionData.Runtime.BootTime) | ForEach-Object { "$($_.days) days $($_.hours) hours"}
 
     }
 
-} | Sort-Object 'Path State'
+} | Sort-Object host
 
 
 ######################
@@ -44,8 +43,8 @@ $Output = $VMHost | ForEach-Object {
     # $WarningState  = $output | where-object {$_.freePercent -lt 20 -or $_.Provisionned -gt 150}
 # Lines to display will display only this number of records but reports the total number of records. leave false to display all records.
 
-$CriticalState = $Output | Where-Object {$_.'Path State' -eq "dead" -or $_.'Lun State' -ne "ok"}
-$WarningState  = $Output | Where-Object {$_.'Path State' -eq "Unknown" -or $_.'Path State' -eq "Disabled"}
+$CriticalState = $false
+$WarningState  = $false
 $NumberLinesDisplay = $false
 
 

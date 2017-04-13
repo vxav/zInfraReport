@@ -9,28 +9,24 @@
 # Place the output object into the output variable.
 # Remember to sort the object in the variable in relevant order (example: sort by snapshot size descending).
 
-$Output = $VMHost | ForEach-Object {
-    
-    $AllLun = $_ | Get-scsilun 
-    
-    $AllLun | Get-scsilunpath | Where-Object {$_.state -eq "dead" -or $_.state -eq "Unknown" -or $_.state -eq "Disabled"} | ForEach-Object {
+$Output = $Vmhost | ForEach-Object {
 
-        $Canonical = $_.SCSILun
+    $HostNetAd = $_ | Get-VMHostNetworkAdapter | where ip
 
-        [pscustomobject]@{
+    [pscustomobject]@{
 
-            Datastore =  $datastore | Where-Object {$_.ExtensionData.Info.Vmfs.Extent.diskname -contains $Canonical} | select -ExpandProperty name
-            Lun = $Canonical
-            Host = ($AllLun | Where-Object {$_.canonicalname -eq $lunid}).vmhost.name
-            'Lun State' = [string](($AllLun | Where-Object {$_.canonicalname -eq $lunid}).extensiondata.operationalstate)
-            Path = $_.LunPath
-            'Path State' = $_.State
-
-        }
-
+        Host = $_.name
+        MgmtIP = $HostNetAd | where ManagementTrafficEnabled | select -ExpandProperty IP
+        MgmtMask = $HostNetAd | where ManagementTrafficEnabled | select -ExpandProperty SubnetMask
+        MgmtVmk = $HostNetAd | where ManagementTrafficEnabled | select -ExpandProperty DeviceName
+        MgmtPortgroup = $HostNetAd | where ManagementTrafficEnabled | select -ExpandProperty PortgroupName
+        VMotionIP = $HostNetAd | where VMotionEnabled | select -ExpandProperty IP
+        VMotionMask = $HostNetAd | where VMotionEnabled | select -ExpandProperty SubnetMask
+        VMotionVmk = $HostNetAd | where VMotionEnabled | select -ExpandProperty DeviceName
+        VMotionPortgroup = $HostNetAd | where VMotionEnabled | select -ExpandProperty PortgroupName
     }
 
-} | Sort-Object 'Path State'
+}
 
 
 ######################
@@ -44,8 +40,8 @@ $Output = $VMHost | ForEach-Object {
     # $WarningState  = $output | where-object {$_.freePercent -lt 20 -or $_.Provisionned -gt 150}
 # Lines to display will display only this number of records but reports the total number of records. leave false to display all records.
 
-$CriticalState = $Output | Where-Object {$_.'Path State' -eq "dead" -or $_.'Lun State' -ne "ok"}
-$WarningState  = $Output | Where-Object {$_.'Path State' -eq "Unknown" -or $_.'Path State' -eq "Disabled"}
+$CriticalState = $false
+$WarningState  = $false
 $NumberLinesDisplay = $false
 
 

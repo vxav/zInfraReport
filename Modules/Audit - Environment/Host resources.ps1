@@ -24,6 +24,7 @@ $Output = $VMHost | ForEach-Object {
         MemoryGB = [math]::round($_.MemoryTotalGB,0)
         MemoryUsage = "$([math]::round($_.MemoryUsageGB / $_.MemoryTotalGB * 100,1)) %"
         NICs     = $_.ExtensionData.Summary.Hardware.NumNics
+        VM = $VM | where vmhost -eq $_ | Measure-Object | select -ExpandProperty Count
         Uptime   = (get-date) - ($_.ExtensionData.Runtime.BootTime) | ForEach-Object { "$($_.days) days $($_.hours) hours"}
 
     }

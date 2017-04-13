@@ -17,7 +17,7 @@ $Output = Get-VIEvent -Entity ($VM) -Start (Get-Date).AddDays(-$days) -maxsample
         [pscustomobject]@{
             VM       = $_.vm.name
             Task     = "Created"
-            Date     = $_.createdtime
+            Date     = get-date $_.createdtime -format u
             Username = $_.username
             Event    = $_.fullformattedmessage
          }
@@ -27,14 +27,14 @@ $Output = Get-VIEvent -Entity ($VM) -Start (Get-Date).AddDays(-$days) -maxsample
         [pscustomobject]@{
             VM       = $_.vm.name
             Task     = "Removed"
-            Date     = $_.createdtime
+            Date     = get-date $_.createdtime -format u
             Username = $_.username
             Event    = $_.fullformattedmessage
          }
 
     }    
 
-} | Sort-Object Date
+} | Sort-Object Date -Descending
 
 ######################
 # Declare object importance and number of lines to display.

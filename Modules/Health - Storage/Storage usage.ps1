@@ -6,7 +6,7 @@ Write-Verbose "Running: $($MyInvocation.MyCommand.Name)"
 # If required declare variables and thresholds here.
 $DatastoreLowPercent = 20
 $DatastoreTooManyVM = 16
-$DatastoreHighProvPercent = 150
+$DatastoreHighProvPercent = 160
 
 # Place the output object into the output variable.
 # Sort the object in the variable in relevant order (example: sort by snapshot size descending).
@@ -49,7 +49,7 @@ $Output = $Datastore | ForEach-Object {
     # $WarningState  = $output | where-object {$_.freePercent -lt 20 -or $_.Provisionned -gt 150}
 # Lines to display will display only this number of records but reports the total number of records. Comment it to display all records.
 
-$CriticalState = $Output | Where-Object {[int]($_.FreeSpace -split " %")[0] -lt 12 -or [int]($_.Provisioned -split " %")[0] -gt 180 -or $_.NbRunningVMs -gt 25}
+$CriticalState = $Output | Where-Object {[int]($_.FreeSpace -split " %")[0] -lt 12 -or $_.NbRunningVMs -gt 25}
 $WarningState  = $Output | Where-Object {[int]($_.FreeSpace -split " %")[0] -lt $DatastoreLowPercent -or [int]($_.Provisioned -split " %")[0] -gt $DatastoreHighProvPercent -or $_.NbRunningVMs -gt $DatastoreTooManyVM}
 $NumberLinesDisplay = $false
 

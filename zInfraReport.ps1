@@ -3,12 +3,11 @@
 
 Name        : zInfraReport
 Author      : Xavier Avrillier
-Last Update : 05/04/2017
-Version     : 0.8
+Last Update : 13/04/2017
+Version     : 0.9
 Website     : http://vxav.fr
 
 The word "Module" in this script refers to each folder inside the Modules folder (except excluded).
-For each "module", there will be an html file and a button/link to each of them on the report page.
 
 ------------------------------------------------
 #>
@@ -46,11 +45,11 @@ param(
 . ".\Metadata\Utility-Functions.ps1"
 
 $PowerCLIModules   = "VMware.VimAutomation.Core","VMware.VimAutomation.Sdk","VMware.VumAutomation"
-$ColorCritical     = "#CD5C5C"
-$ColorWarning      = "#FFA500"
-$ColorInfo         = "#4169E1"
-$ColorNull         = "#FFEBCD"
-$ColorBanner       = "0095d3"
+$JQueryFile        = "Metadata/js/jquery-3.2.1.min.js" # Must use / instead of \ for html notation
+$JQuerySorterFile  = "Metadata/js/jquery.tablesorter.min.js" # Must use / instead of \ for html notation
+$CSSFile           = "Metadata/css/zInfraReport.css" # Must use / instead of \ for html notation
+$TemplateIndexFile = ".\Metadata\Template-index.html"
+$FileEncoding      = "utf8"
 $date              = Get-Date
 
 Clear-Host
@@ -98,7 +97,7 @@ write-output "***   Preparing report modules objects"
 
 Try {
 
-$IndexFile = Copy-Item ".\Metadata\Template-index.html" $HTMLFile -Force -PassThru
+$IndexFile = Copy-Item $TemplateIndexFile $HTMLFile -Force -PassThru 
 
 IF (!(Test-Path "$($IndexFile.Directory)\Reports\")) {New-Item -ItemType Directory "$($IndexFile.Directory)\Reports\"}
 
@@ -113,52 +112,73 @@ $ModuleGroups = Create-ModuleObjects -ModuleGroups (Get-ChildItem Modules | Wher
 # HTML preparation
 ######################
 
-# HTML colors: http://www.w3schools.com/colors/colors_names.asp
+# HTML colors (managed in zInfraReport.css) : http://www.w3schools.com/colors/colors_names.asp
 # The end of the header is generated on a per module basis to allow for the creation of the button bar
 
 write-output "***   --------------------------------"
 write-output "***   Preparing HTML header and footer"
 
 $Header = @"
+<HTML lang="en-US">
 
-<SCRIPT>
-    function Listederoulante() {
-	  i = document.TheForm.List.selectedIndex;
-        if (i == 0) return;
-        url = document.TheForm.List.options[i].value;
-	    parent.location.href = url;
-    }
-</SCRIPT>
+<HEAD>
 
-<style>
-    TABLE {text-align: left; width: 95%; margin: 0px; padding: 0px;}
-    TH {font-size: 8pt;font-family: tahoma, sans-serif;color: #0066cc;}
-    TD {padding: 0px;font-size: 8pt;font-family: tahoma, sans-serif;color: #000000;}
-    tr:nth-child(even){background-color: #E9E9E9}
-</style>
-
+<link rel="stylesheet" type="text/css" href="../$CSSFile">
+<script type="text/javascript" src="../$JQueryFile"></script>
+<script type="text/javascript" src="../$JQuerySorterFile"></script>
 <title>$($DefaultVIserver.name) report</title>
 
-<div align="center" style="background-color:$ColorBanner;">
+</HEAD>
+
+<BODY>
+
+<div align="center" class="headerfooterbg">
     <a href="$("../$($IndexFile.BaseName).html")"><img src=$HeadPicture></a>
 </div>
 
-<div align="center"> 
+<div align="center">
 
 "@
 
-$Footer = @"
+$Footer = @'
 
 </div>
 
 <br>
 
-<div align="center" style="background-color:$ColorBanner;">
-	<font color="FFFFFF">
+<div align="center" class="headerfooterbg">
 	    zInfraReport
-	</font>
 </div>
 
+<script type="text/javascript">
+
+$(function(){
+PLACEJSScriptIDsHERE
+});
+
+function Listederoulante() {
+    i = document.TheForm.List.selectedIndex;
+    if (i == 0) return;
+    url = document.TheForm.List.options[i].value;
+    parent.location.href = url;
+}
+
+</script>
+
+</BODY>
+</HTML>
+
+'@
+
+$ListeHtml =
+@"
+
+<FORM name="TheForm" method="post">
+<SELECT name="List" onChange="Listederoulante(this.form)">
+<OPTION VALUE="">- Change report -
+REPLACELISTE
+</SELECT>
+</FORM>
 "@
 
 ######################
@@ -212,16 +232,16 @@ $ModuleGroups | ForEach-Object {
         $Processed++
     }
 
-    # Setting the button color of this module
+    # Setting the button color and index row of this module
 
     write-output "***     - Setting button color and preparing end of header"
 
     IF ($HtmlReportCritical) {
-        $_.ModuleGroupButton = $_.ModuleGroupButton -replace "REPLACEME",$ColorCritical
+        $_.ModuleGroupButton = $_.ModuleGroupButton -replace "REPLACEME","critical"
         $CriticalIndex += 
 @"
 <tr>
-<td style="Border-left:5px solid $ColorCritical;">
+<td class="criticalindex">
 <a href="$($_.ModuleGroupUrl)">$($_.ModuleGroupFolder.name)</a></td>
 <td>$($_.ModuleGroupDescription)</td>
 <td>$CriticalCount</td>
@@ -230,11 +250,11 @@ $ModuleGroups | ForEach-Object {
 </tr>
 "@
     } ELSEIF ($HtmlReportWarning) {
-        $_.ModuleGroupButton = $_.ModuleGroupButton -replace "REPLACEME",$ColorWarning
+        $_.ModuleGroupButton = $_.ModuleGroupButton -replace "REPLACEME","warning"
         $WarningIndex += 
 @"
 <tr>
-<td style="Border-left:5px solid $ColorWarning;">
+<td class="warningindex">
 <a href="$($_.ModuleGroupUrl)">$($_.ModuleGroupFolder.name)</a></td>
 <td>$($_.ModuleGroupDescription)</td>
 <td>$CriticalCount</td>
@@ -243,11 +263,11 @@ $ModuleGroups | ForEach-Object {
 </tr>
 "@
     } ELSEIF ($HtmlReportInformation) {
-        $_.ModuleGroupButton = $_.ModuleGroupButton -replace "REPLACEME",$ColorInfo
+        $_.ModuleGroupButton = $_.ModuleGroupButton -replace "REPLACEME","information"
         $InfoIndex += 
 @"
 <tr>
-<td style="Border-left:5px solid $ColorInfo;">
+<td class="infoindex">
 <a href="$($_.ModuleGroupUrl)">$($_.ModuleGroupFolder.name)</a></td>
 <td>$($_.ModuleGroupDescription)</td>
 <td>$CriticalCount</td>
@@ -256,11 +276,11 @@ $ModuleGroups | ForEach-Object {
 </tr>
 "@
     } ELSE {
-        $_.ModuleGroupButton = $_.ModuleGroupButton -replace "REPLACEME",$ColorNull
+        $_.ModuleGroupButton = $_.ModuleGroupButton -replace "REPLACEME","noresult"
         $NullIndex += 
 @"
 <tr>
-<td style="Border-left:5px solid $ColorNull;">
+<td class="noresultindex">
 <a href="$($_.ModuleGroupUrl)">$($_.ModuleGroupFolder.name)</a></td>
 <td>$($_.ModuleGroupDescription)</td>
 <td>$CriticalCount</td>
@@ -277,8 +297,8 @@ $ModuleGroups | ForEach-Object {
 
 BUTTONSBAR
 
-<table><tr bgcolor="#A9A9A9">
-    <td style="color:#FFFFFF;">
+<table><tr class="reportinfo">
+    <td class="reportinfo">
         Report date: <b>$date</b>
         <br>
         Server connected : <b>$($DefaultVIserver.name)</b>
@@ -300,9 +320,9 @@ BUTTONSBAR
     $_.ModuleGroupReportContent += $HtmlReportInformation
     $_.ModuleGroupReportContent += "<br>"
     $_.ModuleGroupReportContent += $HtmlReportNull
-    $_.ModuleGroupReportContent += $Footer
+    $_.ModuleGroupReportContent += $Footer -replace "PLACEJSScriptIDsHERE",$JSScriptIDs
 
-    Clear-Variable HtmlReportCritical,HtmlReportWarning,HtmlReportInformation,HtmlReportNull,PostHeader -ErrorAction SilentlyContinue
+    Clear-Variable HtmlReportCritical,HtmlReportWarning,HtmlReportInformation,HtmlReportNull,PostHeader,JSScriptIDs -ErrorAction SilentlyContinue
 
     write-output "***   Processing finished for $($_.ModuleGroupFolder.name)"
     write-output "***   ----------------"
@@ -311,17 +331,6 @@ BUTTONSBAR
 ######################
 # Building report and place button bar
 ######################
-# $($ModuleGroups.ModuleGroupButton) replace
-$ListeHtml =
-@"
-
-<FORM name="TheForm" method="post">
-<SELECT name="List" onChange="Listederoulante(this.form)">
-<OPTION VALUE="">- Change report -
-REPLACELISTE
-</SELECT>
-</FORM>
-"@
 
 write-output "***   --------------------------------"
 write-output "***   Writting reports content in report files"
@@ -346,12 +355,12 @@ $ModuleGroups | ForEach-Object {
 
     # Placing button bar in the report of the current module
 
-    IF (($ModuleGroups | measure-object).count -eq 1) {$rapport = $_.ModuleGroupReportContent -replace "BUTTONSBAR","<!-- Button bar disabled when only a single report -->"}
+    IF (($ModuleGroups | measure-object).count -eq 1) {$rapport = $_.ModuleGroupReportContent -replace "BUTTONSBAR","<!-- Button list disabled when only a single report -->"}
         ELSE {$rapport = $_.ModuleGroupReportContent -replace "BUTTONSBAR",$REPLACELIST}
 
     # Placing the report content in its HTML file
 
-    $rapport | Out-File $_.ModuleGroupReport
+    $rapport | Out-File $_.ModuleGroupReport -Encoding $FileEncoding
 
     IF ($Bouton) {Clear-Variable Bouton}
 
@@ -361,10 +370,11 @@ write-output "***   --------------------------------"
 write-output "***   Writting index file"
 
 (Get-Content $IndexFile) `
+    -replace "THISVCENTER",$Global:DefaultVIServer.name`
     -replace "VCENTERVERSION",$Global:DefaultVIServer.ExtensionData.Content.About.FullName `
     -replace "PLACEREPORTSHERE","$CriticalIndex $WarningIndex $InfoIndex $NullIndex" `
     -replace "DATEHERE",$date `
-    | Out-File $IndexFile -Force
+    | Out-File $IndexFile -Force -Encoding $FileEncoding
 
 Disconnect-VIServer -Confirm:$false
 

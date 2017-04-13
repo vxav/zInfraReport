@@ -23,10 +23,10 @@ Function Gather-EnvironmentData {
 
     write-output "***     - Gathering Clusters"
     $Global:Cluster   = Get-Cluster
-
+    
     write-output "***     - Gathering VM latencies"
     $Global:Latencies24H = $VM | Where powerstate -eq poweredon |  get-stat -stat disk.maxtotallatency.latest -IntervalMins 5
-
+    
 }
 
 Function Connect-vCenter {
@@ -67,7 +67,26 @@ param(
     write-output "***     - HTML formatting of $TableTitle"
 
     IF ($ObjectArray) {
-   
+        
+        $ID = Get-random
+        
+        $SorterTop = @"
+<table id="$ID">
+<thead>
+"@
+
+        $SorterMiddle = @"
+</th>
+</tr>
+</thead>
+<tbody>
+"@
+
+        $SorterBottom = @"
+</tbody>
+</table>
+"@
+
         $PreTitle = ""  # Used next to the title when the number of lines is limited
 
         Switch ($Importance) {
@@ -75,30 +94,37 @@ param(
             "Information" {
                 IF ($ObjectArray.count -gt $NumberLinesDisplay) {$PreTitle = '[First ' + $NumberLinesDisplay + ' results out of ' + ($ObjectArray.count) + ']' }
                 $Script:HtmlReportInformation += ' 
-                <br><table><tr bgcolor="' + $ColorInfo + '"><td style="color:#FFFFFF;"><b>' + $TableTitle + '</b>  ' + $PreTitle + '</td></tr></table>' # Jump a line to make the html file more readable
-                $Script:HtmlReportInformation += $ObjectArray | select -First $NumberLinesDisplay | ConvertTo-Html
+<br><table><tr class="information""><td class="information"><b>' + $TableTitle + '</b>  ' + $PreTitle + '</td></tr></table>
+' # Jump a line to make the html file more readable
+                $Script:HtmlReportInformation += Get-OnlyTable ($ObjectArray | select -First $NumberLinesDisplay | ConvertTo-Html) -ID $ID
                 $Script:InfoCount++
             }
             "Warning"     {
                 IF ($ObjectArray.count -gt $NumberLinesDisplay) {$PreTitle = '[First ' + $NumberLinesDisplay + ' results out of ' + ($ObjectArray.count) + ']' }
                 $Script:HtmlReportWarning += '
-                <br><table><tr bgcolor="' + $ColorWarning + '"><td style="color:#FFFFFF;"><b>' + $TableTitle + '</b>  ' + $PreTitle + '</td></tr></table>'# Jump a line to make the html file more readable
-                $Script:HtmlReportWarning += $ObjectArray | select -First $NumberLinesDisplay | ConvertTo-Html
+<br><table><tr class="warning""><td class="warning"><b>' + $TableTitle + '</b>  ' + $PreTitle + '</td></tr></table>
+'# Jump a line to make the html file more readable
+                $Script:HtmlReportWarning += Get-OnlyTable ($ObjectArray | select -First $NumberLinesDisplay | ConvertTo-Html) -ID $ID
                 $Script:WarningCount++
             }
             "Critical"    {
                 $Script:HtmlReportCritical += '
-                <br><table><tr bgcolor="' + $ColorCritical + '"><td style="color:#FFFFFF;"><b>' + $TableTitle + '</b></td></tr></table>'# Jump a line to make the html file more readable
-                $Script:HtmlReportCritical += $ObjectArray | ConvertTo-Html
+<br><table><tr class="critical"><td class="critical"><b>' + $TableTitle + '</b></td></tr></table>
+'# Jump a line to make the html file more readable
+                $Script:HtmlReportCritical += Get-OnlyTable ($ObjectArray | ConvertTo-Html) -ID $ID
                 $Script:CriticalCount++
             }
 
         }
+
+        $Script:JSScriptIDs += '$(' + "'#$ID" + "').tablesorter();
+        "
     
     } ELSE {
 
         $Script:HtmlReportNull += '
-        <table><tr bgcolor="' + $ColorNull + '"><td style="color:#2F4F4F;"><i>' + $TableTitle + ' : 0</i></td></tr></table>'# Jump a line to make the html file more readable
+<table><tr class="noresult"><td class="noresult"><i>' + $TableTitle + ' : 0</i></td></tr></table>
+'# Jump a line to make the html file more readable
 
     }
 
@@ -133,12 +159,47 @@ Param(
              # HTML for the button to this report without color (REPLACEME).
             ModuleGroupButton = 
 @"
-<OPTION style="background-color:REPLACEME" VALUE="$ReportRelativeURL">$($_.basename)
+<OPTION class="REPLACEME" VALUE="$ReportRelativeURL">$($_.basename)
 
 "@  
 
 
         }
     }
+
+}
+
+Function Get-OnlyTable {
+
+Param(
+[parameter(ValueFromPipeline=$True)]
+[string[]]$Table,
+$ID
+)
+
+begin {
+      
+    $SorterTop = @"
+<table id="$ID">
+<thead>
+"@
+
+    $SorterMiddle = @"
+</th>
+</tr>
+</thead>
+<tbody>
+"@
+
+    $SorterBottom = @"
+</tbody>
+</table>
+"@
+
+    $Table = $Table | where {$_ -notlike "*<colgroup>*</colgroup>"} | out-string
+
+    ($Table -split "<body>" -split "</body>")[1] -replace "<table>",$SorterTop -replace "</th></tr>",$SorterMiddle -replace "</table>",$SorterBottom
+
+}
 
 }

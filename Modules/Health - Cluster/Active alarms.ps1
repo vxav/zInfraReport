@@ -26,7 +26,7 @@ foreach($triggered in $view.TriggeredAlarmState){
   [pscustomobject]@{
 
     Entity = (get-view -id $triggered.entity).name
-    Time = $triggered.Time
+    Time = get-date $triggered.Time -format u
     Name = $_.info.name
     Status = $triggered.OverallStatus
 

@@ -27,6 +27,11 @@ $CriticalState = $false
 $WarningState  = $false
 $NumberLinesDisplay = $false
 
+# If the AppendToLatestReport variable is set to true, the content gathered in this report will be prepended to the previous one instead of replacing it.
+# The global report will still be sorted by sets. If the sort order was Date it will still be ok. If it was by name it could turn into something like " a,b,c,d,a,b,c,d,a,b,c,d".
+# To make it right the output variable would need to be re-sorted before sending back to the main script.
+
+$PrependToLatestReport = $false
 
 ######################
 # Appending metadata to output object.
@@ -35,6 +40,23 @@ $NumberLinesDisplay = $false
 
 IF ($CriticalState) {$Importance = "critical"} ELSEIF ($WarningState) {$Importance = "warning"} ELSE {$Importance = "information"}
 IF (!$NumberLinesDisplay) {$NumberLinesDisplay = [int]::MaxValue}
+
+IF ($PrependToLatestReport) {
+    
+    $FolderCSV = ".\Metadata\PermanentReporting\$($DefaultVIserver.name)"
+    IF (!(test-path $FolderCSV)) {New-Item -ItemType Directory $FolderCSV | out-null}
+    $PrependCSV = "$FolderCSV\$($MyInvocation.MyCommand.Name).csv"
+    
+    IF (Test-Path $PrependCSV) {$LatestReport = Import-Csv $PrependCSV}
+
+    $Output | Export-Csv $PrependCSV
+
+    IF ($LatestReport) {
+        $LatestReport | Export-Csv $PrependCSV -Append
+        $Output = Import-Csv $PrependCSV
+    }
+    
+}
 
 $Output | select *,
     @{l="Importance";e={$Importance}},

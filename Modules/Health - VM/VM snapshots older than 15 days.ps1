@@ -21,7 +21,7 @@ $Output = $VM | where name -NotLike *_replica | ForEach-Object {
 
         # Output properties
         VM = $_.VM
-        Created = $_.Created
+        Created = get-date $_.Created -format u
         Name = $_.name
         Description = $_.description
         SizeGB = [math]::Round($_.SizeGB,2)

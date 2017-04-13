@@ -14,7 +14,7 @@ $Output = $Latencies24H | where value -gt $latencyThreshold | Group-Object -Prop
 
     [pscustomobject]@{
 
-        Time = Get-date "$($_.Name)"
+        Time = Get-date "$($_.Name)" -format u
         VM = $_.count
         AverageLatency = "$([math]::round(($_.group | Measure-Object -Property Value -Average | select -ExpandProperty average),0)) ms"
         MaxLatency = "$($_.group | Measure-Object -Property Value -Maximum | select -ExpandProperty maximum) ms"
